@@ -29,6 +29,7 @@ def get_mean_hc(folder, imt):
     """
     fmt = 'hazard_curve-mean-{:s}*.csv'
     fname = glob(os.path.join(folder, fmt.format(imt)))
+    breakpoint()
     print('Found: {:s}'.format(fname[0]))
     return read_hazard_curve_csv(fname[0])
 
