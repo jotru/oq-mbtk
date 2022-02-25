@@ -1,6 +1,7 @@
 import shapely
 
-from pyproj import Proj, transform
+import numpy as np
+from pyproj import Proj, Transformer
 
 from openquake.mbt.tools.mfd import get_moment_from_mfd
 from openquake.hazardlib.geo.polygon import Polygon
@@ -21,22 +22,26 @@ def get_line_inside_polygon(pnt_lon, pnt_lat, poly_lon, poly_lat):
     :return:
         Indexes of the points inside the polygon
     """
+
     # Fix the projections
-    inProj = Proj(init='epsg:4326')
-    outProj = Proj(proj='lcc', lon_0=poly_lon[0])
+    transformer = Transformer.from_crs(
+        {"proj": 'lcc', "lon_0": poly_lon[0]}, "EPSG:4326", always_xy=True,
+        )
 
     # Create polygon
     poly_xy = []
     for lo, la in zip(poly_lon, poly_lat):
-        x, y = transform(inProj, outProj, lo, la)
+        x, y = transformer(lo, la)
         poly_xy.append((x, y))
     polygon = shapely.geometry.Polygon(poly_xy)
+
     # Create linesting
     line_xy = []
     for lo, la in zip(pnt_lon, pnt_lat):
-        x, y = transform(inProj, outProj, lo, la)
+        x, y = transformer(lo, la)
         line_xy.append((x, y))
     line = shapely.geometry.LineString(line_xy)
+
     # Intersection
     if line.intersects(polygon):
         tmpl = line.intersection(polygon)
@@ -111,31 +116,35 @@ def get_idx_points_inside_polygon(plon, plat, poly_lon, poly_lat,
         Indexes of the points inside the polygon
     """
     selected_idx = []
-    #
+
     # Fix the projections
-    inProj = Proj(init='epsg:4326')
-    outProj = Proj(proj='lcc', lon_0=poly_lon[0], lat_2=45)
-    #
+    mlo = np.mean(poly_lon)
+    cconv = Transformer.from_crs(
+        {"proj": 'robin', "lon_0": mlo, "datum": 'WGS84',
+         "units": 'km'}, "EPSG:4326",
+        always_xy=True)
+
     # Create polygon
     poly_xy = []
     for lo, la in zip(poly_lon, poly_lat):
-        x, y = transform(inProj, outProj, lo, la)
+        x, y = cconv.transform(lo, la)
         poly_xy.append((x, y))
-    #
+
     # Shapely polygon
     polygon = shapely.geometry.Polygon(poly_xy)
-    #
+
     # Add buffer if requested
     buff = polygon.buffer(buff_distance)
-    #
+
     # Find points inside
     cxy = []
     for lo, la, jjj in zip(plon, plat, pnt_idxs):
-        x, y = transform(inProj, outProj, lo, la)
+        x, y = cconv.transform(lo, la)
         cxy.append((x, y))
         point = shapely.geometry.Point((x, y))
         if point.within(buff):
             selected_idx.append(jjj)
+
     return selected_idx
 
 
@@ -156,20 +165,30 @@ def find_points_close_to_multisegment(plon, plat, mseg_lon, mseg_lat, pnt_idxs,
         Indexes of the points nearby the multi-segmented line
     """
     selected_idx = []
+
     # Fix the projections
-    inProj = Proj(init='epsg:4326')
-    outProj = Proj(proj='lcc', lon_0=poly_lon[0])
+    inProj = Proj("epsg:4326")
+    outProj = Proj(proj='lcc', lon_0=np.mean(mseg_lon))
+
+    mila = min(mseg_lon)
+    mala = max(mseg_lat)
+    cconv = Transformer.from_crs(
+        {"proj": 'lcc', "lat_1": mila, "lat_2": mala}, "EPSG:4326",
+        always_xy=True)
+
     # Create polygon
     mseg_xy = []
     for lo, la in zip(mseg_lon, mseg_lat):
-        x, y = transform(inProj, outProj, lo, la)
+        x, y = cconv.transform(inProj, outProj, lo, la)
         mseg_xy.append((x, y))
+
     # Create polygon
     line = shapely.geometry.LineString(mseg_xy)
     buff = line.buffer(buff_distance)
+
     # Find close points
     for lo, la, jjj in zip(plon, plat, pnt_idxs):
-        x, y = transform(inProj, outProj, lo, la)
+        x, y = cconv.transform(inProj, outProj, lo, la)
         point = shapely.geometry.Point((x, y))
         if point.within(buff):
             selected_idx.append(jjj)
