@@ -1,0 +1,37 @@
+openquake.mbi.sub package
+=========================
+
+Submodules
+----------
+
+openquake.mbi.sub.build\_complex\_surface module
+------------------------------------------------
+
+.. automodule:: openquake.mbi.sub.build_complex_surface
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+openquake.mbi.sub.create\_sections\_from\_slab module
+-----------------------------------------------------
+
+.. automodule:: openquake.mbi.sub.create_sections_from_slab
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+openquake.mbi.sub.geojson\_from\_profiles module
+------------------------------------------------
+
+.. automodule:: openquake.mbi.sub.geojson_from_profiles
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Module contents
+---------------
+
+.. automodule:: openquake.mbi.sub
+   :members:
+   :undoc-members:
+   :show-inheritance:
