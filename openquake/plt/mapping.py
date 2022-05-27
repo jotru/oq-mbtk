@@ -120,6 +120,7 @@ class HMTKBaseMap(object):
 
 
         self.cmds = []
+        #self.cmds.append("export GMT_SESSION_NAME=$$")
         self.cmds.append("gmt begin")
         tmp = 'gmt basemap {} {} -BWSne+t"{}"'.format(self.R, self.J, self.title)
         tmp += " {}".format(self.ax)
@@ -165,27 +166,28 @@ class HMTKBaseMap(object):
         
         df = pd.DataFrame({'lo':lons, 'la':lats, 'd':zz, 'm':mags})
         cat_tmp = '{}/cat_tmp.csv'.format(self.out)
+        cat_tmp_gmt = 'cat_tmp.csv'.format(self.out)
         self.gmt_files_list.append(cat_tmp)
 
         df.sort_values(by=['m']).to_csv(cat_tmp, index = False, header = False)
 
         if cpt_file == "tmp.cpt":
-            cpt_fle = "{}/{}".format(self.out, cpt_file)
+            cpt_fle = "{}".format(cpt_file)
             if logscale is True:
                 cmd = "gmt makecpt -Cjet"
                 cmd += " -T{}/{}/30+n".format(np.log10(zmin), np.log10(zmax))
-                cmd += " -Q -D > {}".format(cpt_fle)
-                self.cmds.insert(0, cmd)
+                cmd += " -Q -D > {}".format(cpt_fle+" -H")
+                self.cmds.insert(1, cmd)
             else:
                 cmd = "gmt makecpt -Cjet"
                 cmd += " -T{}/{}/30+n".format(zmin, zmax)
-                cmd += " -D > {}".format(cpt_fle)
-                self.cmds.insert(0, cmd)
+                cmd += " -D > {}".format(cpt_fle+" -H")
+                self.cmds.insert(1, cmd)
             self.gmt_files_list.append(cpt_fle)
         else:
             cpt_fle = cpt_file
 
-        tmp = "gmt plot {} -Sc -C{} -Wthinnest,black".format(cat_tmp,cpt_fle)
+        tmp = "gmt plot {} -Sc -C{} -Wthinnest,black".format(cat_tmp_gmt,cpt_fle)
         self.cmds.append(tmp)
         if logscale:
             self.cmds.append('gmt colorbar -DJBC -Ba+l"{}" -C{} -Q'.format(
@@ -203,6 +205,7 @@ class HMTKBaseMap(object):
         Called by self.add_catalogue. Adds legend for catalogue seismicity
         '''
 
+        fname_gmt = 'legend.csv'.format(self.out)
         fname = '{}/legend.csv'.format(self.out)
         fou = open(fname, 'w')
         fou.write("L 9p R Magnitude\n")
@@ -220,7 +223,7 @@ class HMTKBaseMap(object):
 
         fou.close()
 
-        tmp = "gmt legend {} -DJMR -C0.3c ".format(fname)
+        tmp = "gmt legend {} -DJMR -C0.3c ".format(fname_gmt)
         tmp += "--FONT_ANNOT_PRIMARY=9p"
         self.cmds.append(tmp)
         
@@ -304,7 +307,7 @@ class HMTKBaseMap(object):
             cpt_fle = "{}/sf_tmp.cpt".format(self.out)
             self.gmt_files_list.append(cpt_fle)
             self.cmds.insert(0,"gmt makecpt -Cjet -T0/{}/30+n > {:s}".format(
-                self.max_sf_depth*1.2, cpt_fle))
+                self.max_sf_depth*1.2, cpt_fle+" -H"))
 
             self.cmds.append('gmt plot {} -C{} -Ss0.075 -t50 '.format(filename, cpt_fle))
             self.cmds.append('gmt colorbar -DJBC -Ba{}+l"Depth to simple fault surface (km)" -C{}'.format(
@@ -352,7 +355,7 @@ class HMTKBaseMap(object):
             cpt_fle = "{}/cf_tmp.cpt".format(self.out)
             self.gmt_files_list.append(cpt_fle)
             self.cmds.insert(0,"gmt makecpt -Cjet -T0/{}/2> {:s}".format(
-                self.max_cf_depth, cpt_fle))
+                self.max_cf_depth, cpt_fle+" -H"))
 
             self.cmds.append('gmt plot {} -C{} -Ss0.075 -t90'.format(filename, cpt_fle))
             self.cmds.append('gmt colorbar -DJBC -Ba{}+l"Depth to complex fault surface (km)" -C{}'.format(
@@ -409,18 +412,21 @@ class HMTKBaseMap(object):
             :class:`openquake.hazardlib.nrml.SourceModel`
         '''
 
-        for grp in model.src_groups:
-            for source in grp:
-                if type(source).__name__ == 'AreaSource':
-                    self.plot_polygon(source.polygon)
-                elif type(source).__name__ == 'PointSource': 
-                    self._plot_point_source(source)
-                elif type(source).__name__ == 'ComplexFaultSource':
-                    self._plot_complex_fault(source)
-                elif type(source).__name__ == 'SimpleFaultSource':
-                    self._plot_simple_fault(source)
-                else:
-                    pass
+        #for grp in model.src_groups:
+        for source in model.sources:
+            #print(type(source).__name__)
+            if type(source).__name__ == 'AreaSource':
+                self.plot_polygon(source.polygon)
+            if type(source).__name__ == 'mtkAreaSource':
+                self.plot_polygon(source.geometry)               
+            elif type(source).__name__ == 'PointSource': 
+                self._plot_point_source(source)
+            elif type(source).__name__ == 'ComplexFaultSource':
+                self._plot_complex_fault(source)
+            elif type(source).__name__ == 'SimpleFaultSource':
+                self._plot_simple_fault(source)
+            else:
+                pass
 
     def add_colour_scaled_points(self, longitude, latitude, data, label='',
             shape="-Ss", size=0.3, logscale=False):
@@ -449,11 +455,11 @@ class HMTKBaseMap(object):
         if logscale:
             self.cmds.insert(0,"gmt makecpt -Cjet -T{}/{}/30+n -Q -D > \
                              {}".format(np.log10(min(data)), 
-                                 np.log10(max(data)), cpt_fle))
+                                 np.log10(max(data)), cpt_fle+" -H"))
             qq = '-Q'
         else:
             self.cmds.insert(0,"gmt makecpt -Cjet -T{}/{}/30+n -D > \
-                             {}".format(min(data), max(data), cpt_fle))
+                             {}".format(min(data), max(data), cpt_fle + " -H"))
             qq = ''
 
 
@@ -651,22 +657,33 @@ class HMTKBaseMap(object):
         # remove any old instances of gmt end, then re-add
         # necessary in case plotting occurs at differt stages
 
-        self.cmds=[x for x in self.cmds if x != "gmt end" and "gmt figure" not in x]
+        self.cmds=[x for x in self.cmds if x != "gmt end show" and "gmt figure" not in x]
 
         if 'makecpt' in self.cmds[0]:
             put = 2
         else:
             put = 1
-
+        #subprocess.call(f"cd {self.out}",shell=True)
+        subprocess.call("export GMT_SESSION_NAME=$$",shell=True)
+        #print(f"mkdir {self.out}")
         self.cmds.insert(put, "gmt figure {}/{} {}".format(self.out, filestring, filetype))
-        self.cmds.append("gmt end")
+        self.cmds.append("gmt end show")
 
         self._check_output(filename)
-
-        for cmd in self.cmds:
-            if verb:
-                print(cmd)
-            out = subprocess.call(cmd, shell=True)
+        #i=0
+        #for cmd in self.cmds:
+            #if verb:
+                #print(cmd)
+            #out = subprocess.call(cmd, shell=True)
+        out = subprocess.call('\n'.join(self.cmds),shell=True)
+        if verb:
+            print('\n'.join(self.cmds))
+            #print(cmd)
+            #if i==1:
+            	#break
+            #i+=1
+            
+        #print("The cmd is ",self.cmds)
 
         print("Map saved to {}/{}.{}.".format(self.out, filestring, filetype))
         
@@ -682,8 +699,8 @@ class HMTKBaseMap(object):
             filename to use for saved GMT script 
         '''
 
-        if self.cmds[-1] != "gmt end":
-            self.cmds.append("gmt end")
+        if self.cmds[-1] != "gmt end show":
+            self.cmds.append("gmt end show")
 
         fname = '{}/{}'.format(self.out, scriptname)
         
